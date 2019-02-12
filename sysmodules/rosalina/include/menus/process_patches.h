@@ -1,6 +1,6 @@
 /*
 *   This file is part of Luma3DS
-*   Copyright (C) 2016-2017 Aurora Wright, TuxSH
+*   Copyright (C) 2016-2018 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
 *   it under the terms of the GNU General Public License as published by
@@ -29,7 +29,4 @@
 #include <3ds/types.h>
 #include "menu.h"
 
-extern Menu processPatchesMenu;
-
-void ProcessPatchesMenu_PatchUnpatchSM(void);
-void ProcessPatchesMenu_PatchUnpatchFS(void);
+void ProcessPatchesMenu_PatchUnpatchFSDirectly(void);

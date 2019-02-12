@@ -1,6 +1,6 @@
 /*
 *   This file is part of Luma3DS
-*   Copyright (C) 2016-2017 Aurora Wright, TuxSH
+*   Copyright (C) 2016-2018 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
 *   it under the terms of the GNU General Public License as published by
@@ -28,12 +28,12 @@
 #include "menu.h"
 #include "draw.h"
 #include "fmt.h"
-#include "mcu.h"
 #include "memory.h"
 #include "ifile.h"
 #include "menus.h"
 #include "utils.h"
 #include "menus/n3ds.h"
+#include "menus/cheats.h"
 #include "minisoc.h"
 
 u32 waitInputWithTimeout(u32 msec)
@@ -124,26 +124,6 @@ u32 waitCombo(void)
     return waitComboWithTimeout(0);
 }
 
-static Result _MCUHWC_GetBatteryLevel(u8 *out)
-{
-    #define TRY(expr) if(R_FAILED(res = (expr))) { mcuExit(); return res; }
-    Result res;
-
-    TRY(mcuInit());
-
-    u32 *cmdbuf = getThreadCommandBuffer();
-    cmdbuf[0] = 0x50000;
-
-    TRY(svcSendSyncRequest(mcuhwcHandle));
-
-    *out = (u8) cmdbuf[2];
-
-    svcCloseHandle(mcuhwcHandle);
-    return cmdbuf[1];
-
-    #undef TRY
-}
-
 static MyThread menuThread;
 static u8 ALIGN(8) menuThreadStack[THREAD_STACK_SIZE];
 static u8 batteryLevel = 255;
@@ -163,20 +143,33 @@ void menuThreadMain(void)
     if(!isN3DS)
     {
         rosalinaMenu.nbItems--;
-        for(u32 i = 3; i <= rosalinaMenu.nbItems; i++)
+        for(u32 i = 0; i <= rosalinaMenu.nbItems; i++)
             rosalinaMenu.items[i] = rosalinaMenu.items[i+1];
     }
     else
         N3DSMenu_UpdateStatus();
 
+    bool isAcURegistered = false;
+
     while(!terminationRequest)
     {
         if((HID_PAD & menuCombo) == menuCombo)
         {
-            menuEnter();
-            if(isN3DS) N3DSMenu_UpdateStatus();
-            menuShow(&rosalinaMenu);
-            menuLeave();
+            if (!isAcURegistered)
+                isAcURegistered = R_SUCCEEDED(srvIsServiceRegistered(&isAcURegistered, "ac:u"))
+                    && isAcURegistered;
+
+            if (isAcURegistered)
+            {
+                menuEnter();
+                if(isN3DS) N3DSMenu_UpdateStatus();
+                menuShow(&rosalinaMenu);
+                menuLeave();
+            }
+        }
+        else
+        {
+            Cheat_ApplyCheats();
         }
         svcSleepThread(50 * 1000 * 1000LL);
     }
@@ -214,8 +207,15 @@ static void menuDraw(Menu *menu, u32 selected)
     s64 out;
     u32 version, commitHash;
     bool isRelease;
+    bool isMcuHwcRegistered;
 
-    if(R_FAILED(_MCUHWC_GetBatteryLevel(&batteryLevel)))
+    if(R_SUCCEEDED(srvIsServiceRegistered(&isMcuHwcRegistered, "mcu::HWC")) && isMcuHwcRegistered && R_SUCCEEDED(mcuHwcInit()))
+    {
+        if(R_FAILED(MCUHWC_GetBatteryLevel(&batteryLevel)))
+            batteryLevel = 255;
+        mcuHwcExit();
+    }
+    else
         batteryLevel = 255;
 
     svcGetSystemInfo(&out, 0x10000, 0);

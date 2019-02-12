@@ -1,6 +1,6 @@
 /*
 *   This file is part of Luma3DS
-*   Copyright (C) 2016-2017 Aurora Wright, TuxSH
+*   Copyright (C) 2016-2018 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
 *   it under the terms of the GNU General Public License as published by
@@ -44,13 +44,14 @@ extern ConfigurationStatus needConfig;
 extern FirmwareSource firmSource;
 
 bool isSdMode;
-u16 launchedPath[41];
+u16 launchedPath[80+1];
 BootType bootType;
 
 void main(int argc, char **argv, u32 magicWord)
 {
     bool isFirmProtEnabled,
          isSafeMode = false,
+         needToInitSd = false,
          isNoForceFlagSet = false,
          isNtrBoot;
     FirmwareType firmType;
@@ -60,13 +61,13 @@ void main(int argc, char **argv, u32 magicWord)
 
     //Shell closed, no error booting NTRCARD, NAND paritions not even considered
     isNtrBoot = bootMediaStatus[3] == 2 && !bootMediaStatus[1] && !bootPartitionsStatus[0] && !bootPartitionsStatus[1];
- 
+
     if((magicWord & 0xFFFF) == 0xBEEF && argc >= 1) //Normal (B9S) boot
     {
         bootType = isNtrBoot ? B9SNTR : B9S;
 
         u32 i;
-        for(i = 0; i < 40 && argv[0][i] != 0; i++) //Copy and convert the path to UTF-16
+        for(i = 0; i < sizeof(launchedPath)/2 - 1 && argv[0][i] != 0; i++) //Copy and convert the path to UTF-16
             launchedPath[i] = argv[0][i];
         launchedPath[i] = 0;
     }
@@ -76,7 +77,7 @@ void main(int argc, char **argv, u32 magicWord)
 
         u32 i;
         u16 *p = (u16 *)argv[0];
-        for(i = 0; i < 40 && p[i] != 0; i++)
+        for(i = 0; i < sizeof(launchedPath)/2 - 1 && p[i] != 0; i++)
             launchedPath[i] = p[i];
         launchedPath[i] = 0;
     }
@@ -112,7 +113,6 @@ void main(int argc, char **argv, u32 magicWord)
     }
     else if(memcmp(launchedPath, u"nand", 8) == 0)
     {
-        firmSource = FIRMWARE_SYSNAND;
         if(!mountFs(false, true)) error("Failed to mount CTRNAND.");
         isSdMode = false;
     }
@@ -193,9 +193,16 @@ void main(int argc, char **argv, u32 magicWord)
             goto boot;
         }
 
-        /* Else, force the last used boot options unless a button is pressed
+        //Account for DSiWare soft resets if exiting TWL_FIRM
+        if(CFG_BOOTENV == 3)
+        {
+            static const u8 TLNC[] = {0x54, 0x4C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4E, 0x43};
+            if(memcmp((void *)0x20000C00, TLNC, 10) == 0) needToInitSd = true;
+        }
+
+        /* Force the last used boot options if autobooting a TWL title, or unless a button is pressed
            or the no-forcing flag is set */
-        if(!pressed && !BOOTCFG_NOFORCEFLAG)
+        if(needToInitSd || memcmp((void *)0x20000300, "TLNC", 4) == 0 || (!pressed && !BOOTCFG_NOFORCEFLAG))
         {
             nandType = (FirmwareSource)BOOTCFG_NAND;
             firmSource = (FirmwareSource)BOOTCFG_FIRM;
@@ -224,6 +231,7 @@ void main(int argc, char **argv, u32 magicWord)
         firmSource = FIRMWARE_SYSNAND;
 
         isSafeMode = true;
+        needToInitSd = true;
 
         //If the PIN has been verified, wait to make it easier to press the SAFE_MODE combo
         if(pinExists && !shouldLoadConfigMenu)
@@ -321,8 +329,6 @@ boot:
         writeConfig(false);
     }
 
-    if(isSdMode && !mountFs(false, false)) error("Failed to mount CTRNAND.");
-
     bool loadFromStorage = CONFIG(LOADEXTFIRMSANDMODULES);
     u32 firmVersion = loadNintendoFirm(&firmType, firmSource, loadFromStorage, isSafeMode);
 
@@ -331,7 +337,7 @@ boot:
     switch(firmType)
     {
         case NATIVE_FIRM:
-            res = patchNativeFirm(firmVersion, nandType, loadFromStorage, isFirmProtEnabled, isSafeMode, doUnitinfoPatch);
+            res = patchNativeFirm(firmVersion, nandType, loadFromStorage, isFirmProtEnabled, needToInitSd, doUnitinfoPatch);
             break;
         case TWL_FIRM:
             res = patchTwlFirm(firmVersion, loadFromStorage, doUnitinfoPatch);

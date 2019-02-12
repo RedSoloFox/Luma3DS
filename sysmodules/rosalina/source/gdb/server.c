@@ -1,6 +1,6 @@
 /*
 *   This file is part of Luma3DS
-*   Copyright (C) 2016-2017 Aurora Wright, TuxSH
+*   Copyright (C) 2016-2018 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
 *   it under the terms of the GNU General Public License as published by
@@ -211,7 +211,7 @@ void GDB_ReleaseClient(GDBServer *server, GDBContext *ctx)
     ctx->nbThreads = 0;
     memset(ctx->threadInfos, 0, sizeof(ctx->threadInfos));
     ctx->catchThreadEvents = false;
-    ctx->isGDB = false;
+    ctx->enableExternalMemoryAccess = false;
     RecursiveLock_Unlock(&ctx->lock);
 }
 

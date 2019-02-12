@@ -1,6 +1,6 @@
 /*
 *   This file is part of Luma3DS
-*   Copyright (C) 2016-2017 Aurora Wright, TuxSH
+*   Copyright (C) 2016-2018 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
 *   it under the terms of the GNU General Public License as published by
@@ -26,12 +26,14 @@
 
 #pragma once
 
-#include <3ds.h>
+#include "types.h"
+#include "globals.h"
+#include "kernel.h"
+#include "utils.h"
 
-Handle mcuhwcHandle;
+extern KRecursiveLock dbgParamsLock;
+extern u32 dbgParamWatchpointId, dbgParamDVA, dbgParamWCR, dbgParamContextId;
 
-Result mcuInit(void);
-Result mcuExit(void);
-Result mcuReadRegister(u8 reg, u8* data, u32 size);
-Result mcuWriteRegister(u8 reg, u8* data, u32 size);
-Result mcuGetLEDState(u8* out);
+KSchedulableInterruptEvent *enableMonitorModeDebugging(KBaseInterruptEvent *this, u32 interruptID);
+KSchedulableInterruptEvent *disableWatchpoint(KBaseInterruptEvent *this, u32 interruptID);
+KSchedulableInterruptEvent *setWatchpointWithContextId(KBaseInterruptEvent *this, u32 interruptID);

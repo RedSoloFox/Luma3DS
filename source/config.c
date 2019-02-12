@@ -1,6 +1,6 @@
 /*
 *   This file is part of Luma3DS
-*   Copyright (C) 2016-2017 Aurora Wright, TuxSH
+*   Copyright (C) 2016-2018 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
 *   it under the terms of the GNU General Public License as published by
@@ -27,9 +27,11 @@
 #include "config.h"
 #include "memory.h"
 #include "fs.h"
+#include "strings.h"
 #include "utils.h"
 #include "screen.h"
 #include "draw.h"
+#include "emunand.h"
 #include "buttons.h"
 #include "pin.h"
 
@@ -81,6 +83,7 @@ void configMenu(bool oldPinStatus, u32 oldPinMode)
     static const char *multiOptionsText[]  = { "Default EmuNAND: 1( ) 2( ) 3( ) 4( )",
                                                "Screen brightness: 4( ) 3( ) 2( ) 1( )",
                                                "Splash: Off( ) Before( ) After( ) payloads",
+                                               "Splash duration: 1( ) 3( ) 5( ) 7( ) seconds",
                                                "PIN lock: Off( ) 4( ) 6( ) 8( ) digits",
                                                "New 3DS CPU: Off( ) Clock( ) L2( ) Clock+L2( )",
                                              };
@@ -91,7 +94,6 @@ void configMenu(bool oldPinStatus, u32 oldPinMode)
                                                "( ) Enable game patching",
                                                "( ) Show NAND or user string in System Settings",
                                                "( ) Show GBA boot screen in patched AGB_FIRM",
-                                               "( ) Patch ARM9 access",
                                                "( ) Set developer UNITINFO",
                                                "( ) Disable ARM11 exception handlers",
                                              };
@@ -109,6 +111,11 @@ void configMenu(bool oldPinStatus, u32 oldPinMode)
                                                  "button hints).\n\n"
                                                  "\t* 'After payloads' displays it\n"
                                                  "afterwards.",
+
+                                                 "Select how long the splash screen\n"
+                                                 "displays.\n\n"
+                                                 "This has no effect if the splash\n"
+                                                 "screen is not enabled.",
 
                                                  "Activate a PIN lock.\n\n"
                                                  "The PIN will be asked each time\n"
@@ -174,10 +181,6 @@ void configMenu(bool oldPinStatus, u32 oldPinMode)
                                                  "Enable showing the GBA boot screen\n"
                                                  "when booting GBA games.",
 
-                                                 "Disable ARM9 exheader access checks.\n\n"
-                                                 "Only select this if you know what you\n"
-                                                 "are doing!",
-
                                                  "Make the console be always detected\n"
                                                  "as a development unit, and conversely.\n"
                                                  "(which breaks online features, amiibo\n"
@@ -194,17 +197,25 @@ void configMenu(bool oldPinStatus, u32 oldPinMode)
                                                  "GitHub repository!"
                                                };
 
+    FirmwareSource nandType = FIRMWARE_SYSNAND;
+    if(isSdMode)
+    {
+        nandType = FIRMWARE_EMUNAND;
+        locateEmuNand(&nandType);
+    }
+
     struct multiOption {
         u32 posXs[4];
         u32 posY;
         u32 enabled;
         bool visible;
     } multiOptions[] = {
-        { .posXs = {19, 24, 29, 34}, .visible = isSdMode },
-        { .posXs = {21, 26, 31, 36}, .visible = true },
-        { .posXs = {12, 22, 31, 0}, .visible = true  },
-        { .posXs = {14, 19, 24, 29}, .visible = true },
-        { .posXs = {17, 26, 32, 44}, .visible = ISN3DS },
+        { .visible = nandType == FIRMWARE_EMUNAND },
+        { .visible = true },
+        { .visible = true  },
+        { .visible = true },
+        { .visible = true },
+        { .visible = ISN3DS },
     };
 
     struct singleOption {
@@ -212,9 +223,8 @@ void configMenu(bool oldPinStatus, u32 oldPinMode)
         bool enabled;
         bool visible;
     } singleOptions[] = {
-        { .visible = isSdMode },
-        { .visible = isSdMode },
-        { .visible = true },
+        { .visible = nandType == FIRMWARE_EMUNAND },
+        { .visible = nandType == FIRMWARE_EMUNAND },
         { .visible = true },
         { .visible = true },
         { .visible = true },
@@ -233,7 +243,15 @@ void configMenu(bool oldPinStatus, u32 oldPinMode)
 
     //Parse the existing options
     for(u32 i = 0; i < multiOptionsAmount; i++)
+    {
+        //Detect the positions where the "x" should go
+        u32 optionNum = 0;
+        for(u32 j = 0; optionNum < 4 && j < strlen(multiOptionsText[i]); j++)
+            if(multiOptionsText[i][j] == '(') multiOptions[i].posXs[optionNum++] = j + 1;
+        while(optionNum < 4) multiOptions[i].posXs[optionNum++] = 0;
+
         multiOptions[i].enabled = MULTICONFIG(i);
+    }
     for(u32 i = 0; i < singleOptionsAmount; i++)
         singleOptions[i].enabled = CONFIG(i);
 
@@ -290,9 +308,9 @@ void configMenu(bool oldPinStatus, u32 oldPinMode)
         u32 pressed;
         do
         {
-            pressed = waitInput(true);
+            pressed = waitInput(true) & MENU_BUTTONS;
         }
-        while(!(pressed & MENU_BUTTONS));
+        while(!pressed);
 
         if(pressed == BUTTON_START) break;
 

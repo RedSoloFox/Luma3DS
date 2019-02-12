@@ -1,6 +1,6 @@
 /*
 *   This file is part of Luma3DS
-*   Copyright (C) 2016-2017 Aurora Wright, TuxSH
+*   Copyright (C) 2016-2018 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
 *   it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@
 
 void installArm9Handlers(void)
 {
-    memcpy((void *)0x01FF8000, arm9_exceptions_bin + 32, arm9_exceptions_bin_size - 32);
+    memcpy((void *)0x01FF8000, arm9_exceptions_bin, arm9_exceptions_bin_size);
 
     /* IRQHandler is at 0x08000000, but we won't handle it for some reasons
        svcHandler is at 0x08000010, but we won't handle svc either */
@@ -47,8 +47,10 @@ void installArm9Handlers(void)
     for(u32 i = 0; i < 4; i++)
     {
         *(vu32 *)(0x08000000 + offsets[i]) = 0xE51FF004;
-        *(vu32 *)(0x08000000 + offsets[i] + 4) = *((u32 *)arm9_exceptions_bin + 1 + i);
+        *(vu32 *)(0x08000000 + offsets[i] + 4) = *(vu32 *)(0x01FF8008 + 4 * i);
     }
+
+    *(vu32 *)0x01FF8004 = 0; //BreakPtr
 }
 
 void detectAndProcessExceptionDumps(void)
@@ -72,8 +74,8 @@ void detectAndProcessExceptionDumps(void)
         "SP", "LR", "PC", "CPSR", "FPEXC"
     },
                       *faultStatusNames[] = {
-        "Alignment", "Instruction cache maintenance operation",
-        "External Abort on translation - First-level", "External Abort on translation - Second-level",
+        "Alignment", "Instr.cache maintenance op.",
+        "Ext.Abort on translation - Lv1", "Ext.Abort on translation - Lv2",
         "Translation - Section", "Translation - Page", "Access bit - Section", "Access bit - Page",
         "Domain - Section", "Domain - Page", "Permission - Section", "Permission - Page",
         "Precise External Abort", "Imprecise External Abort", "Debug event"
@@ -117,7 +119,7 @@ void detectAndProcessExceptionDumps(void)
     else
         posY = drawFormattedString(true, 10, posY + SPACING_Y, COLOR_WHITE, "Exception type:  %s", handledExceptionNames[dumpHeader->type]);
 
-    if(dumpHeader->type >= 2)
+    if(dumpHeader->processor == 11 && dumpHeader->type >= 2)
     {
         u32 xfsr = (dumpHeader->type == 2 ? regs[18] : regs[17]) & 0xF;
 
@@ -129,7 +131,7 @@ void detectAndProcessExceptionDumps(void)
             }
     }
 
-    if(dumpHeader->processor == 11 && dumpHeader->additionalDataSize != 0)
+    if(dumpHeader->additionalDataSize != 0)
         posY = drawFormattedString(true, 10, posY + SPACING_Y, COLOR_WHITE,
                                    "Current process: %.8s (%016llX)", (const char *)additionalData, *(vu64 *)(additionalData + 8));
     posY += SPACING_Y;
@@ -144,7 +146,7 @@ void detectAndProcessExceptionDumps(void)
             posY = drawFormattedString(true, 10 + 22 * SPACING_X, posY, COLOR_WHITE, "%-7s%08X", registerNames[i + 1], regs[20]);
     }
 
-    if(dumpHeader->type == 3)
+    if(dumpHeader->processor == 11 && dumpHeader->type == 3)
         posY = drawFormattedString(true, 10, posY + SPACING_Y, COLOR_WHITE, "%-7s%08X       Access type: %s", "FAR", regs[19], regs[17] & (1u << 11) ? "Write" : "Read");
 
     posY += SPACING_Y;

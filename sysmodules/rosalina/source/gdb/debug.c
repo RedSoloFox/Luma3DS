@@ -1,6 +1,6 @@
 /*
 *   This file is part of Luma3DS
-*   Copyright (C) 2016-2017 Aurora Wright, TuxSH
+*   Copyright (C) 2016-2018 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
 *   it under the terms of the GNU General Public License as published by
@@ -173,26 +173,22 @@ static int GDB_ParseCommonThreadInfo(char *out, GDBContext *ctx, int sig)
     if(R_SUCCEEDED(r))
         n += sprintf(out + n, "core:%x;", core);
 
-    if(ctx->isGDB)
-    {
-        for(u32 i = 0; i <= 12; i++)
-            n += sprintf(out + n, "%x:%08x;", i, __builtin_bswap32(regs.cpu_registers.r[i]));
-    }
+    for(u32 i = 0; i <= 12; i++)
+        n += sprintf(out + n, "%x:%08x;", i, __builtin_bswap32(regs.cpu_registers.r[i]));
+
     n += sprintf(out + n, "d:%08x;e:%08x;f:%08x;19:%08x;",
         __builtin_bswap32(regs.cpu_registers.sp), __builtin_bswap32(regs.cpu_registers.lr), __builtin_bswap32(regs.cpu_registers.pc),
         __builtin_bswap32(regs.cpu_registers.cpsr));
 
-    if(ctx->isGDB)
+    for(u32 i = 0; i < 16; i++)
     {
-        for(u32 i = 0; i < 16; i++)
-        {
-            u64 val;
-            memcpy(&val, &regs.fpu_registers.d[i], 8);
-            n += sprintf(out + n, "%x:%016llx;", 26 + i, __builtin_bswap64(val));
-        }
-
-        n += sprintf(out + n, "2a:%08x;2b:%08x;", __builtin_bswap32(regs.fpu_registers.fpscr), __builtin_bswap32(regs.fpu_registers.fpexc));
+        u64 val;
+        memcpy(&val, &regs.fpu_registers.d[i], 8);
+        n += sprintf(out + n, "%x:%016llx;", 26 + i, __builtin_bswap64(val));
     }
+
+    n += sprintf(out + n, "2a:%08x;2b:%08x;", __builtin_bswap32(regs.fpu_registers.fpscr), __builtin_bswap32(regs.fpu_registers.fpexc));
+
     return n;
 }
 

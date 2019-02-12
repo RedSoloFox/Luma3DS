@@ -1,6 +1,6 @@
 /*
 *   This file is part of Luma3DS
-*   Copyright (C) 2016-2017 Aurora Wright, TuxSH
+*   Copyright (C) 2016-2018 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
 *   it under the terms of the GNU General Public License as published by
@@ -71,7 +71,7 @@ Result GetSystemInfoHook(s64 *out, s32 type, s32 param)
                 case 0x201: // isN3DS
                     *out = (cfwInfo.flags >> 4) & 1;
                     break;
-                case 0x202: // isSafeMode
+                case 0x202: // needToInitSd
                     *out = (cfwInfo.flags >> 5) & 1;
                     break;
                 case 0x203: // isSdMode

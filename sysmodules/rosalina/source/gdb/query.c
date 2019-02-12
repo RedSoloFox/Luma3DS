@@ -1,6 +1,6 @@
 /*
 *   This file is part of Luma3DS
-*   Copyright (C) 2016-2017 Aurora Wright, TuxSH
+*   Copyright (C) 2016-2018 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
 *   it under the terms of the GNU General Public License as published by
@@ -120,7 +120,6 @@ GDB_DECLARE_QUERY_HANDLER(Supported)
 
 GDB_DECLARE_QUERY_HANDLER(StartNoAckMode)
 {
-    ctx->isGDB = true;
     ctx->state = GDB_STATE_NOACK_SENT;
     return GDB_ReplyOk(ctx);
 }

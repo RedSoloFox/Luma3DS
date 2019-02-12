@@ -1,6 +1,6 @@
 /*
 *   This file is part of Luma3DS
-*   Copyright (C) 2016-2017 Aurora Wright, TuxSH
+*   Copyright (C) 2016-2018 Aurora Wright, TuxSH
 *
 *   This program is free software: you can redistribute it and/or modify
 *   it under the terms of the GNU General Public License as published by
@@ -111,7 +111,7 @@ typedef struct GDBContext
     u32 nbWatchpoints;
     u32 watchpoints[2];
 
-    bool isGDB;
+    bool enableExternalMemoryAccess;
     char *commandData, *commandEnd;
     int latestSentPacketSize;
     char buffer[GDB_BUF_LEN + 4];
